@@ -17,10 +17,11 @@
 #   6. exec run.sh (the actions runner loop).
 #
 # Per-job environment hygiene (clean /tmp/gh-aw, remove leftover containers,
-# prune networks) is handled by /opt/gh-sr/hooks/job-started.sh and
-# /opt/gh-sr/hooks/job-completed.sh, so every job runs from a known-clean state
-# on this long-lived runner. The inner Docker image-layer cache under
-# /runner-state/docker-data is preserved across jobs (never pruned).
+# prune networks, repair _work ownership left by root-privileged jobs) is
+# handled by /opt/gh-sr/hooks/job-started.sh and /opt/gh-sr/hooks/job-completed.sh,
+# so every job runs from a known-clean state on this long-lived runner. The inner
+# Docker image-layer cache under /runner-state/docker-data is preserved across
+# jobs (never pruned).
 #
 # Environment variables injected by `docker run`:
 #   GH_SR_RUNNER_NAME   — unique runner name (e.g. "myrepo-agentic-1")

@@ -205,7 +205,7 @@ func TestAgenticRunnerDockerfileRootlessBase(t *testing.T) {
 		"jq",       // gh-aw framework steps
 		"gnupg",    // apt keyrings / gpg-signed workflows
 		"imagemagick",
-		"wget",      // fetched by consumer workflows; also a hard Depends of the Google Chrome .deb
+		"wget",      // fetched by consumer workflows
 		"libpq-dev", // Rails/pg system tests (ohmyxin workload)
 	} {
 		if !installed[want] {
@@ -391,21 +391,33 @@ func TestAgenticRunnerDockerfileInstallsNodeLTS(t *testing.T) {
 	}
 }
 
-// TestAgenticRunnerDockerfileBakesChrome guards the baked browser: Selenium
-// system tests in consumer workflows need google-chrome on PATH (Selenium
-// WebDriver 4.x auto-manages the matching chromedriver), and the install must
-// stay arm64-guarded because Google publishes no arm64 Linux build — an
-// unguarded download would break arm64 image builds.
-func TestAgenticRunnerDockerfileBakesChrome(t *testing.T) {
+// TestAgenticRunnerDockerfileHasNoBakedChrome guards the browser posture: no
+// google-chrome is baked into the image (consumer system tests download a pinned
+// Chrome-for-Testing build at runtime instead, and dl.google.com is TLS-reset
+// from the runner host, which broke every rebuild while the step existed), but
+// the CfT runtime libs must stay in the core apt manifest — without them a CfT
+// launch dies with "cannot open shared object file: libatk-1.0.so.0".
+func TestAgenticRunnerDockerfileHasNoBakedChrome(t *testing.T) {
 	t.Parallel()
+	// Only instruction lines are banned: the Dockerfile's prose comments
+	// document why the browser is not baked and legitimately mention chrome.
+	for _, line := range strings.Split(agenticRunnerDockerfile, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if strings.Contains(strings.ToLower(trimmed), "chrome") {
+			t.Errorf("Dockerfile must not bake google-chrome (instruction line %q found)", trimmed)
+		}
+	}
 	for _, want := range []string{
-		"https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb",
-		`case "${TARGETARCH}" in arm64)`,
-		"apt-get install -y --no-install-recommends /tmp/chrome.deb",
-		"google-chrome --version",
+		"fonts-liberation",
+		"libatk1.0-0t64",
+		"libnss3",
 	} {
-		if !strings.Contains(agenticRunnerDockerfile, want) {
-			t.Fatalf("Dockerfile should bake Google Chrome with %q, got:\n%s", want, agenticRunnerDockerfile)
+		if !strings.Contains(agenticRunnerAptPackagesCore, want) {
+			t.Errorf("core apt manifest should bake Chrome-for-Testing runtime libs (%q missing):\n%s",
+				want, agenticRunnerAptPackagesCore)
 		}
 	}
 }
